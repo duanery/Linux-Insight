@@ -1,6 +1,6 @@
 # 内核模块分析框架
 
-> [![48](https://github.com/duanery/picture/blob/master/github/github_black_48px.png)](https://duanery.github.io)
+> [![40](https://github.com/duanery/picture/blob/master/github/github_black_40px.png)](https://duanery.github.io)
 > &nbsp;&nbsp;
 > ***作者*** &nbsp;
 > 2019年1月23日
