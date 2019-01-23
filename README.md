@@ -49,6 +49,6 @@ tracepoint跟踪接口，导出符号，内核如何使用接口*
 ### man手册
 
 ### 外网链接
-*[Linux kallsyms 机制分析][1]*
+*\[1\] [Linux kallsyms 机制分析][1]*
 
 [1]: https://blog.csdn.net/kehyuanyu/article/details/46346321 "CSDN"
