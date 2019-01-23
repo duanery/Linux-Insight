@@ -1,6 +1,6 @@
 # kallsyms
 
-> [![48](https://github.com/duanery/picture/blob/master/github/github_black_48px.png)](https://duanery.github.io)
+> [![40](https://github.com/duanery/picture/blob/master/github/github_black_40px.png)](https://duanery.github.io)
 > ***duanery***&nbsp;
 > 2019年1月23日
 > 
