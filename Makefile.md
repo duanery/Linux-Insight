@@ -270,10 +270,6 @@ trap - EXIT
 
 headers_install.sh脚本内部主要是把内核头文件中不必要的宏定义去掉。转换成用户空间的头文件。
 
-## make install
-
-TODO
-
 # kbuild Makefile
 
 ## kbuild
