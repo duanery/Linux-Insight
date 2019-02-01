@@ -3,7 +3,7 @@
 > [![40](https://github.com/duanery/picture/blob/master/github/github_black_40px.png)](https://duanery.github.io)
 > &nbsp;&nbsp;
 > ***duanery*** &nbsp;
-> 2019年1月23日
+> 2019年1月31日
 >
 > Linux爱好者
 
@@ -57,7 +57,7 @@ include arch/$(SRCARCH)/Makefile
 
 键入make命令会执行默认的all规则，直接编译vmlinux。
 
-包含arch Makefile。
+top Makefile会包含arch Makefile（`include arch/$(SRCARCH)/Makefile`）。
 
 ```makefile
 # Final link of vmlinux with optional arch pass after final link
@@ -69,7 +69,7 @@ vmlinux: scripts/link-vmlinux.sh vmlinux_prereq $(vmlinux-deps) FORCE
 	+$(call if_changed,link-vmlinux)
 ```
 
-vmlinux通过scripts/link-vmlinux.sh脚本链接。依赖于vmlinux_prereq、$(vmlinux-deps)。
+vmlinux通过`scripts/link-vmlinux.sh`脚本链接。依赖于vmlinux_prereq、$(vmlinux-deps)。
 
 ```makefile
 core-y		+= kernel/ certs/ mm/ fs/ ipc/ security/ crypto/ block/
@@ -101,7 +101,7 @@ export KBUILD_ALLDIRS := $(sort $(filter-out arch/%,$(vmlinux-alldirs)) arch Doc
 vmlinux-deps := $(KBUILD_LDS) $(KBUILD_VMLINUX_INIT) $(KBUILD_VMLINUX_MAIN)
 ```
 
-vmlinux-deps主要是vmlinux的核心目录组成（init/、net/、kernel/、mm/、fs/、ipc/、block/）。
+vmlinux-deps主要是linux内核的核心目录组成（init/、net/、kernel/、mm/、fs/、ipc/、block/）。
 
 每个核心目录编译完成后，都会在目录下生成built-in.o文件，最终这些built-in.o文件链接成vmlinux。
 
@@ -531,7 +531,52 @@ graph TD
 	arch/x86/boot/header.o -- ld --> arch/x86/boot/setup.elf
 ```
 
+## install
 
+通过`make install`可以把内核安装到/boot/目录中，
+
+`arch/x86/Makefile`
+
+```makefile
+install:
+	$(Q)$(MAKE) $(build)=$(boot) $@
+```
+
+`arch/x86/boot/Makefile`
+
+```makefile
+install:
+	sh $(srctree)/$(src)/install.sh $(KERNELRELEASE) $(obj)/bzImage \
+		System.map "$(INSTALL_PATH)"
+```
+
+安装的核心脚本是通过`arch/x86/boot/install.sh`进行的。
+
+```bash
+# Arguments:
+#   $1 - kernel version
+#   $2 - kernel image file
+#   $3 - kernel map file
+#   $4 - default install path (blank if root directory)
+#
+if [ -x ~/bin/${INSTALLKERNEL} ]; then exec ~/bin/${INSTALLKERNEL} "$@"; fi
+if [ -x /sbin/${INSTALLKERNEL} ]; then exec /sbin/${INSTALLKERNEL} "$@"; fi
+
+# Default install - same as make zlilo
+if [ -f $4/vmlinuz ]; then
+	mv $4/vmlinuz $4/vmlinuz.old
+fi
+if [ -f $4/System.map ]; then
+	mv $4/System.map $4/System.old
+fi
+cat $2 > $4/vmlinuz
+cp $3 $4/System.map
+...
+```
+
+如果/sbin/installkernel命令存在，则执行该命令。该命令一般会把bzImage安装成/boot/vmlinuz-`VERSION`这样的形式，.config安装成config-`VERSION`文件，System.map安装成System.map-`VERSION`文件。
+
+如果不存在，则通过`cat $2 > $4/vmlinuz`把编译好的bzImage安装到/boot/vmlinuz文件。
 
 ## 参考文档
 
