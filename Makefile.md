@@ -153,7 +153,29 @@ prepare: prepare0 prepare-objtool
 在进入每个内核目录进行编译前，需要先准备。
 
 - 准备script/目录下的一些工具
+
 - 准备arch/$(SRCARCH)/中的一些头文件和特定的工具
+
+### asm-generic
+
+```makefile
+# Support for using generic headers in asm-generic
+PHONY += asm-generic
+asm-generic:
+	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.asm-generic \
+	            src=asm obj=arch/$(SRCARCH)/include/generated/asm
+	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.asm-generic \
+	            src=uapi/asm obj=arch/$(SRCARCH)/include/generated/uapi/asm
+```
+
+Makefile.asm-generic脚本会读取/arch/x86/include/asm/Kbuild文件，并把其中generic-y、genhdr-y、generated-y定义的头文件都引用到asm-generic目录下，实际引用位置是/include/asm-generic。
+
+```makefile
+quiet_cmd_wrap = WRAP    $@
+cmd_wrap = echo "\#include <asm-generic/$*.h>" >$@
+```
+
+实际上ARCH目录未定义的头文件，会引用asm-generic目录下的头文件。
 
 ## make modules
 
@@ -275,6 +297,35 @@ headers_install.sh脚本内部主要是把内核头文件中不必要的宏定�
 ## kbuild
 
 TODO
+
+### vmlinux.lds
+
+`scripts/Makefile.build`
+
+```makefile
+# top Makefile
+CC		= $(CROSS_COMPILE)gcc
+CPP		= $(CC) -E
+
+# Linker scripts preprocessor (.lds.S -> .lds)
+# ---------------------------------------------------------------------------
+quiet_cmd_cpp_lds_S = LDS     $@
+      cmd_cpp_lds_S = $(CPP) $(cpp_flags) -P -C -U$(ARCH) \
+	                     -D__ASSEMBLY__ -DLINKER_SCRIPT -o $@ $<
+
+$(obj)/%.lds: $(src)/%.lds.S FORCE
+	$(call if_changed_dep,cpp_lds_S)
+```
+
+.lds文件是由.lds.S文件生成的，只是调用gcc进行预处理之后就能生成.lds文件。主要做的就是宏展开。
+
+`arch/x86/kernel/vmlinux.lds.S`
+
+```c
+#include <asm-generic/vmlinux.lds.h>
+```
+
+可以看到vmlinux.lds.S文件，包含了一部分的头文件，及宏定义。
 
 ## hostprogs
 
@@ -574,9 +625,9 @@ cp $3 $4/System.map
 
 如果不存在，则通过`cat $2 > $4/vmlinuz`把编译好的bzImage安装到/boot/vmlinuz文件。
 
-## 参考文档
+# 参考文档
 
-### 内核文档
+## 内核文档
 
 Documentation/kbuild/*
 

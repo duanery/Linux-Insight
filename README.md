@@ -2,10 +2,10 @@
 
 > [![40](https://github.com/duanery/picture/blob/master/github/github_black_40px.png)](https://duanery.github.io)
 > &nbsp;&nbsp;
-> ***作者*** &nbsp;
+> ***duanery*** &nbsp;
 > 2019年1月23日
 > 
-> 作者简介
+> Linux爱好者
 
 *核心原理简介*
 
@@ -17,6 +17,10 @@
 
 ## 源码简析
 *简要介绍核心源码，或者详解核心源码*
+
+### 内核线程
+
+*介绍内核线程的作用与交互（如果存在内核线程的话）*
 
 ## 接口
 *proc文件系统接口，sys文件系统接口，系统调用接口，debugfs文件系统接口，
