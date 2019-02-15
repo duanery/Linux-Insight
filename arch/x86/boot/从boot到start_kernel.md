@@ -231,9 +231,9 @@ boot_params结构定义在setup.bin内部。会把header.S中的头拷贝到boot
 
 1. GDT描述符已经建立好，并且不会再调用ldgt重新加载新的GDT了。
 
-2. 页表(cr3寄存器)使用的是early_level4_pgt，这个结构存放在.init.data section中，最终会被释放掉，所以这不是最终的页表。只是临时页表。
+2. 页表(cr3寄存器)使用的是early_level4_pgt，这个结构存放在`.init.data` section中，最终会被释放掉，所以这不是最终的页表。只是临时页表。
 
-3. 临时页表只映射了 ffffffff80000000 - ffffffff9fffffff 这块内核空间。
+3. 临时页表只映射了 `ffffffff80000000 - ffffffff9fffffff` 这块内核空间。
 
 4. 建立了一个早期的中断，处理缺页异常，用来在 0xffff880000000000 地址处建立物理地址的直接映射。
 
