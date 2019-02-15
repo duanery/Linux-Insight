@@ -183,7 +183,7 @@ boot_params结构定义在setup.bin内部。会把header.S中的头拷贝到boot
 
      可以看到__per_cpu_load的定义，及`.data..percpu..first` section放在percpu区域的最开始的位置。
 
-   - 可以得出结论：gs的base值初始化为`irq_stack_union + __per_cpu_load`，就是初始化为percpu的起始区域。可以用%gs:的方式访问初始的percpu变量。
+   - 可以得出结论：gs的base值初始化为`irq_stack_union + __per_cpu_load`，就是初始化为percpu的起始区域。可以用%gs:的方式访问所有的percpu变量。
 
 9. 跳入x86_64_start_kernel函数中
 
@@ -254,7 +254,6 @@ boot_params结构定义在setup.bin内部。会把header.S中的头拷贝到boot
 
    current是读取current_task这个percpu变量的，而current_task的初始值就是init_task。
 
-7. 
 
 ## 疑问
 
