@@ -31,16 +31,9 @@ mount -t debugfs none /sys/kernel/debug
 | struct dentry *debugfs_create_size_t(const char *name, umode_t mode, struct dentry *parent, size_t *value) | 把一个size_t类型的内核变量转换为以name为名字的文件，存放在parent目录下。文件的访问模式是mode。 |
 | struct dentry *debugfs_create_atomic_t(const char *name, umode_t mode, struct dentry *parent, atomic_t *value) | 把一个atomic_t类型的内核变量转换为以name为名字的文件，存放在parent目录下。文件的访问模式是mode。 |
 | struct dentry *debugfs_create_bool(const char *name, umode_t mode, struct dentry *parent, bool *value) | 把一个bool类型的内核变量转换为以name为名字的文件，存放在parent目录下。文件的访问模式是mode。true:"Y"，false:"N" |
-| struct dentry *debugfs_create_blob(const char *name, umode_t mode, struct dentry *parent, struct debugfs_blob_wrapper *blob) | struct debugfs_blob_wrapper {
-	void *data;
-	unsigned long size;
-}; data类型 |
+| struct dentry *debugfs_create_blob(const char *name, umode_t mode, struct dentry *parent, struct debugfs_blob_wrapper *blob) | 参考源码                                                     |
 | struct dentry *debugfs_create_u32_array(const char *name, umode_t mode, struct dentry *parent, u32 *array, u32 elements) | 把u32类型的数组转换为以name为名字的文件。文件内容："12 2345 3456789 0123456789" |
-| struct dentry *debugfs_create_regset32(const char *name, umode_t mode, struct dentry *parent, struct debugfs_regset32 *regset) | struct debugfs_regset32 {
-	const struct debugfs_reg32 *regs;
-	int nregs;
-	void __iomem *base;
-}; |
+| struct dentry *debugfs_create_regset32(const char *name, umode_t mode, struct dentry *parent, struct debugfs_regset32 *regset) | 参考源码                                                     |
 
 如果parent的值为NULL，则创建的文件在debugfs的挂载点目录下。
 
