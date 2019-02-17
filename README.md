@@ -42,6 +42,10 @@ tracepoint跟踪接口，导出符号，内核如何使用接口*
 
 ### 其他模块如何使用本接口
 
+### 内核参数
+
+*Documention/kernel_parameters.txt*
+
 ## 统计信息
 *主要是proc文件系统内导出的内核参数*
 
