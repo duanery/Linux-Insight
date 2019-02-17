@@ -7,12 +7,13 @@
 > 
 > Linux爱好者
 
-debugfs是调试文件系统，必须很方便于调试。内核调试除了printk之外，还可以通过`文件系统读取文件`的方式来读取内核中的一个变量，读取内核的一个数组等。这些文件需要存放到目录中来管理。
+debugfs是调试文件系统，必须很方便于调试。内核调试除了printk之外，还可以通过文件的方式来读取内核中的一个变量，读取内核的一个数组等。这些文件还可以存放到目录中来管理。
 
 ## 挂载
 
 ```bash
 mount -t debugfs none /sys/kernel/debug
+ls /sys/kernel/debug
 ```
 
 ## 文件API
@@ -56,6 +57,8 @@ mount -t debugfs none /sys/kernel/debug
 | 函数                                                         | 描述                                                         |
 | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | struct dentry *debugfs_create_automount(const char *name, struct dentry *parent, debugfs_automount_t f, void *data) | 在debugfs的parent目录下创建name名字的目录，之后调用f指定的函数在该目录上挂载新的文件系统。 |
+
+如果parent的值为NULL，则在debugfs的挂载点目录下创建目录。
 
 ## 移除API
 
