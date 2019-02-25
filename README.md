@@ -42,7 +42,7 @@ tracepoint跟踪接口，导出符号，内核如何使用接口*
 
 ### 其他模块如何使用本接口
 
-### 内核参数
+### boot参数
 
 *Documention/kernel_parameters.txt*
 
