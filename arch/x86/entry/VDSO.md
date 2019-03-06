@@ -68,7 +68,7 @@ quiet_cmd_vdso = VDSO    $@
 		 sh $(srctree)/$(src)/checkundef.sh '$(NM)' '$@'
 ```
 
-可以看到.so是通过objcopy自.so.dbg。vdso64.so.dbg是通过cmd_vdso这个命令编译来的，依赖于vdso.lds链接脚本和vobjs，vobjs包含vdso-note.o，vclock_gettime.o，vgetcpu.o这三个文件。
+可以看到.so是objcopy自.so.dbg。vdso64.so.dbg是通过cmd_vdso这个命令编译来的，依赖于vdso.lds链接脚本和vobjs，vobjs包含vdso-note.o，vclock_gettime.o，vgetcpu.o这三个文件。
 
 vdso64.so包含的就是一个动态库，内部包含了vclock_gettime.o，vgetcpu.o这两个核心源码文件，内部定义了`clock_gettime`,`gettimeofday`,`time`,`getcpu`这4个函数。具体见下文分析。
 
@@ -101,7 +101,7 @@ const struct vdso_image vdso_image_64 = {
 };    
 ```
 
-主要是定义了vdso_image_64这个结构体，把vdso64.so文件转换成raw_data这个数组，占用2个页，页对齐。
+主要是定义了vdso_image_64这个结构体，把vdso64.so文件转换成raw_data这个数组，占用2个页，页边界对齐。
 
 ## VVAR
 
@@ -332,7 +332,7 @@ static int load_elf_binary(struct linux_binprm *bprm)
 
 execve系统调用在执行时会调用`load_elf_binary`来解析elf二进制程序来建立进程的地址空间，其中就会调用`arch_setup_additional_pages`建立[vvar]和[vdso]这两个线性区。
 
-`create_elf_tables`会告知用户态进行一些核心信息。其中就包含vdso的线性地址
+`create_elf_tables`会建立用户态的参数，环境变量，AUXV。其中就包含vdso的线性地址。
 
 ```c
 static int
@@ -401,7 +401,7 @@ void update_vsyscall(struct timekeeper *tk)
 
 [vdso]对应的页在vmlinux中，vdso_image_64.data位置，页对齐。
 
-用户态进行调用time这里系统调用时，会触发缺页异常，在进程页表中建立映射。
+用户态进行调用time这样的系统调用时，会触发缺页异常，在进程页表中建立映射。
 
 ## 接口
 
