@@ -61,3 +61,33 @@ static inline void poll_wait(struct file * filp, wait_queue_head_t * wait_addres
 - `select, poll`的poll_wait主要是把`poll_table_entry`这个结构加入filp对应的等待队列中，当filp有数据时就调用唤醒回调函数`pollwake`，然后唤醒调用select和poll系统调用的进程P，P就继续再次读取filp文件的可读可写信息。可以看到select和poll系统调用内传递的fd越多，进程P就会加入到越多的等待队列上，任意一个filp有数据都会唤醒进程P。
 - `epoll`的poll_wait主要把`eppoll_entry`这个结构加入filp对应的等待队列中，当filp有数据时就会唤醒回调函数`ep_poll_callback`，进而把filp加入到epoll的ready list中了，然后唤醒调用epoll系统调用的进程P，P然后读取ready list来获取可用的filp。任意一个filp有数据也会唤醒进程P。
 
+看一下pipe的poll接口：
+
+```c
+static unsigned int
+pipe_poll(struct file *filp, poll_table *wait)
+{
+	unsigned int mask;
+	struct pipe_inode_info *pipe = filp->private_data;
+	int nrbufs;
+
+	poll_wait(filp, &pipe->wait, wait);
+
+	nrbufs = pipe->nrbufs;
+	mask = 0;
+	if (filp->f_mode & FMODE_READ) {
+		mask = (nrbufs > 0) ? POLLIN | POLLRDNORM : 0;
+		if (!pipe->writers && filp->f_version != pipe->w_counter)
+			mask |= POLLHUP;
+	}
+	if (filp->f_mode & FMODE_WRITE) {
+		mask |= (nrbufs < pipe->buffers) ? POLLOUT | POLLWRNORM : 0;
+		if (!pipe->readers)
+			mask |= POLLERR;
+	}
+	return mask;
+}
+```
+
+可以看到在poll接口内调用poll_wait函数，而且poll接口会返回可读可写位掩码。
+
