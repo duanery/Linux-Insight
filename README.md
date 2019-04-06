@@ -61,6 +61,10 @@ tracepoint跟踪接口，导出符号，内核如何使用接口*
 ### man手册
 
 ### 外网链接
-*\[1\] [Linux kallsyms 机制分析][1]*
+*\[1\] [linux-insides][1]*
 
-[1]: https://blog.csdn.net/kehyuanyu/article/details/46346321 "CSDN"
+*\[2\] [kernel_exploring][2]*
+
+[1]: https://0xax.gitbooks.io/linux-insides/ "linux-insides"
+[2]: https://richardweiyang.gitbooks.io/kernel-exploring/	"kernel_exploring"
+
