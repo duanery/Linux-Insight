@@ -19,19 +19,21 @@ boot_params结构定义在setup.bin内部。会把header.S中的头拷贝到boot
 
 安装gdt。
 
-跳入保护模式代码。cs会设置为__BOOT_CS，ds设置为\_\_BOOT_DS.
+开启包含模式。
+
+跳入保护模式代码。cs会设置为__BOOT_CS，ds设置为\_\_BOOT_DS.此时还未启用分页。
 
 ## 保护模式
 
 保护模式代码从`arch/x86/boot/compressed/head_64.S`文件的`startup_32`开始。
 
 1. 重新加载gdt，使用64位segment。
-
-2. 建立虚拟地址0-4G到物理地址0-4G的对等映射，使用的是4级页表。
-3. 把4级页表写入cr3.
-4. 开启long mode（64位模式），之后会进入兼容模式（因为目前的cs还是__BOOT_CS）。
-5. 开启分页。
-6. 跳入64位模式。cs会重新设置为__KERNEL_CS，指令IP会使用64位虚拟地址。
+2. 开启PAE模式。
+3. 建立虚拟地址0-4G到物理地址0-4G的对等映射，使用的是4级页表。
+4. 把4级页表写入cr3.
+5. 开启long mode（64位模式），此时已经处于兼容模式（因为目前的cs还是__BOOT_CS）。
+6. 开启分页。
+7. 跳入64位模式。cs会重新设置为__KERNEL_CS，指令IP会使用64位虚拟地址。
 
 ## 64位模式
 
@@ -57,7 +59,9 @@ boot_params结构定义在setup.bin内部。会把header.S中的头拷贝到boot
 
 3. 修复0xffffffff8000000虚拟地址的映射，使其映射到vmlinux对应的物理内存上。
 
-4. 把early_level4_pgt载入cr3，建立新的页表
+4. 设置phys_base，vmlinux加载的物理地址-16M的位置。这个变量用于把0xffffffff8000000-0xffffffffffffffff范围内的虚拟地址转换为物理地址。
+
+5. 把early_level4_pgt载入cr3，建立新的页表
    - 新页表包含vmlinux物理地址的映射（KASLR随机选择的物理地址，或者0x100000）
    - 新页表包含vmlinux虚拟地址的映射（0xffffffff8000000）
 
@@ -69,7 +73,7 @@ boot_params结构定义在setup.bin内部。会把header.S中的头拷贝到boot
    	movq	%rax, %cr3
    ```
 
-5. 跳入vmlinux虚拟地址中
+6. 跳入vmlinux虚拟地址中
 
    ```asm
    	/* Ensure I am executing from virtual addresses */
@@ -79,9 +83,11 @@ boot_params结构定义在setup.bin内部。会把header.S中的头拷贝到boot
    1:
    ```
 
-   从此时开始后续则全部进入内核虚拟地址空间中了。
+   从此时开始后续则全部进入内核虚拟地址空间中了。rip及内核变量都通过0xffffffff8000000-0xffffffffffffffff这个范围内的虚拟地址进行访问。
 
-6. 初始化栈，主要是把init_thread_union加载到rsp。
+   RIP也会跳入到这块虚拟地址范围内了。
+
+7. 初始化栈，主要是把init_thread_union加载到rsp。
 
    ```asm
    /* Setup a boot time stack */
@@ -91,7 +97,7 @@ boot_params结构定义在setup.bin内部。会把header.S中的头拷贝到boot
    	.quad  init_thread_union+THREAD_SIZE-8
    ```
 
-7. 重新加载新的gdt
+8. 重新加载新的gdt
 
    ```asm
    lgdt	early_gdt_descr(%rip)
@@ -107,7 +113,7 @@ boot_params结构定义在setup.bin内部。会把header.S中的头拷贝到boot
 
    gdt_page地址存放的是GDT描述符表。
 
-8. Set up %gs.
+9. Set up %gs.
 
    ```asm
    	/* Set up %gs.
@@ -185,9 +191,9 @@ boot_params结构定义在setup.bin内部。会把header.S中的头拷贝到boot
 
    - 可以得出结论：gs的base值初始化为`irq_stack_union + __per_cpu_load`，就是初始化为percpu的起始区域。可以用%gs:的方式访问所有的percpu变量。
 
-9. 跳入x86_64_start_kernel函数中
+10. 跳入x86_64_start_kernel函数中
 
-   - 清除vmlinux物理地址的映射
+   - 清除vmlinux物理地址的映射，清除的是对等映射。
 
    - 建立早期的中断，主要处理缺页异常。
 
@@ -239,7 +245,7 @@ boot_params结构定义在setup.bin内部。会把header.S中的头拷贝到boot
 
 5. boot cpu可以基于%gs:的方式访问任意的percpu变量。只是这时访问的percpu是初始的percpu区域。
 
-6. current指向了init_task任务。
+6. current指向了init_task任务，也就是init进程。
 
    ```c
    DEFINE_PER_CPU(struct task_struct *, current_task) ____cacheline_aligned =

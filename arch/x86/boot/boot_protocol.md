@@ -55,12 +55,12 @@ Offset	Proto	Name		Meaning
 /Size
 
 01F1/1	ALL(1	setup_sects	The size of the setup in sectors
-01F2/2	ALL	root_flags	If set, the root is mounted readonly
+01F2/2	ALL		root_flags	If set, the root is mounted readonly
 01F4/4	2.04+(2	syssize		The size of the 32-bit code in 16-byte paras
-01F8/2	ALL	ram_size	DO NOT USE - for bootsect.S use only
-01FA/2	ALL	vid_mode	Video mode control
-01FC/2	ALL	root_dev	Default root device number
-01FE/2	ALL	boot_flag	0xAA55 magic number
+01F8/2	ALL		ram_size	DO NOT USE - for bootsect.S use only
+01FA/2	ALL		vid_mode	Video mode control
+01FC/2	ALL		root_dev	Default root device number
+01FE/2	ALL		boot_flag	0xAA55 magic number
 0200/2	2.00+	jump		Jump instruction
 0202/4	2.00+	header		Magic signature "HdrS"
 0206/2	2.00+	version		Boot protocol version supported
