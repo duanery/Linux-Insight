@@ -9,7 +9,7 @@
 
 该函数主要用于x86体系结构的初始化。
 
-内容比较多。
+内容比较多。加*的是重点关注内容。
 
 ```c
 /*
@@ -46,13 +46,15 @@ void __init setup_arch(char **cmdline_p)
 
 从内核日志可以分析到内核启动参数。
 
-## 3
+## 3* 加载IDT
 
 ```c
 	early_trap_init();
 ```
 
-注册Debug和Breakpoint2个异常。
+注册Debug和Breakpoint2个异常。把idt_descr加载到idt寄存器。之后只需要通过注册`中断门，陷阱门，系统中断门，系统陷阱门`就可以注册异常处理程序。
+
+中断描述符初始化完成。
 
 ## 4
 
@@ -181,7 +183,7 @@ void __init setup_arch(char **cmdline_p)
 
 并拷贝到command_line中。
 
-## 13
+## 13* 解析早期内核参数
 
 ```c
 	parse_early_param();
@@ -298,7 +300,7 @@ init_cache_modes();
 
 PAT支持
 
-## 22*
+## 22* KASLR
 
 ```c
 	/*
@@ -395,7 +397,7 @@ high_memory是物理内存最大地址。是一个虚拟地址。__va返回的�
 
 在`ffffffff80000000 - ffffffff9fffffff (=512 MB)  kernel text mapping, from phys 0`内核text映射地址范围内，清除`_text到_brk_end`之外的多余的映射。步长PMD_SIZE. level2_kernel_pgt.
 
-## 28*
+## 28* memblock填充
 
 ```c
 	memblock_set_current_limit(ISA_END_ADDRESS);
@@ -424,6 +426,8 @@ high_memory是物理内存最大地址。是一个虚拟地址。__va返回的�
 [    0.000000] memblock_reserve: [0x00000000001000-0x0000000000ffff] flags 0x0 setup_bios_corruption_check+0x131/0x192
 ```
 
+在这之后就可以使用memblock来分配物理内存。
+
 ## 29
 
 ```c
@@ -442,28 +446,242 @@ high_memory是物理内存最大地址。是一个虚拟地址。__va返回的�
 
 实模式代码的作用：TODO
 
-## 31
+## 31* 物理内存直接映射
 
 ```c
 	init_mem_mapping();
 ```
 
+这个函数建立物理内存的直接映射。把物理地址[0 - max]映射到虚拟地址[ffff880000000000 - ffffc7ffffffffff].
 
+会剔除掉物理内存之间的空洞。0-1M之间的空洞不会剔除掉。
+
+```
+ffff880000000000 - ffffc7ffffffffff (=64 TB) direct mapping of all phys. memory
+```
+
+物理内存的直接映射是从`ffff880000000000`地址开始的，最大64TB。如果开启KASLR，则起始地址存放在page_offset_base变量中。这是随机选择的一块虚拟地址。
+
+### 31.1 函数内部
+
+```c
+void __init init_mem_mapping(void)
+{
+	unsigned long end;
+
+	probe_page_size_mask();
+```
+
+`probe_page_size_mask()`探测cpu是否支持2M/1G的大页，以及Global TLB标志。
+
+```c
+#ifdef CONFIG_X86_64
+	end = max_pfn << PAGE_SHIFT;
+#else
+	end = max_low_pfn << PAGE_SHIFT;
+#endif
+```
+
+确定物理地址的最后一个地址。
+
+```c
+	/* the ISA range is always mapped regardless of memory holes */
+	init_memory_mapping(0, ISA_END_ADDRESS);
+```
+
+映射[0-1M]之间的物理地址到[ffff880000000000 + 1M].
+
+```c
+	/* Init the trampoline, possibly with KASLR memory offset */
+	init_trampoline();
+```
+
+把[ffff880000000000 + 1M]页表保存下来。
+
+```c
+	if (memblock_bottom_up()) {
+		...
+	} else {
+		memory_map_top_down(ISA_END_ADDRESS, end);
+	}
+```
+
+映射[1M - end]之间的物理地址到[ffff880000000000+1M - ffff880000000000+end].
+
+[1M - end]之间的物理地址会存在空洞，空洞不会进行映射。可以参考内核代码注释。
+
+```c
+#ifdef CONFIG_X86_64
+	if (max_pfn > max_low_pfn) {
+		/* can we preseve max_low_pfn ?*/
+		max_low_pfn = max_pfn;
+	}
+#else
+	...
+#endif
+```
+
+max_low_pfn = max_pfn;
+
+```c
+	load_cr3(swapper_pg_dir);
+	__flush_tlb_all();
+
+	early_memtest(0, max_pfn_mapped << PAGE_SHIFT);
+}
+```
+
+把init进程页表加载到cr3.  刷新tlb。
+
+前面建立的直接映射都是修改的init进程页表，这里加载到cr3之后，通过__va得到的虚拟地址就可以直接访问了。不会再产生缺页异常。
+
+### 31.2 疑问
+
+建立直接映射时，一定会分配4K字节的pud、pmd、pte来存放页表项。那么操作这些页表项使用的虚拟地址(通过alloc_low_page函数分配)也是通过__va得到的，访问这个虚拟地址会发生什么？
+
+在最后load_cr3之前，使用的是early_level4_pgt这个早期的临时页表。访问未映射的虚拟地址时，会发生缺页异常，在缺页异常处理程序内部会在early_level4_pgt上建立临时页表。所以可以访问__va得到的虚拟地址。
+
+### 31.3 PAGE_OFFSET
+
+物理地址加上PAGE_OFFSET得到在内核空间的虚拟地址。根据这个条件，PAGE_OFFSET就等于`ffff880000000000`或page_offset_base的值。
 
 ## 32
 
+```c
+	early_trap_pf_init();
+```
+
+注册缺页异常处理程序。`set_intr_gate(X86_TRAP_PF, page_fault);`
+
+前面已经加载过IDT寄存器了，这里只需要注册中断门，缺页异常就直接可以处理了。
+
+因为31步中物理内存的直接映射已经建立好了，不再需要早期的缺页异常处理程序了，就把缺页异常初始化为最终的page_fault函数，最终会调用do_page_fault.
+
 ## 33
+
+```c
+	memblock_set_current_limit(get_max_mapped());
+```
+
+设置memblock的限制为最大内存。
+
+之后从memblock分配物理内存，就能分配到高地址的物理内存。
 
 ## 34
 
+```c
+	/* Allocate bigger log buffer */
+	setup_log_buf(1);
+```
+
+如果配置了log_buf_len这个内核参数，就从memblock中分配一个缓冲区，存放printk打印的日志。
+
+```
+	log_buf_len=n[KMG]	Sets the size of the printk ring buffer,
+			in bytes.  n must be a power of two and greater
+			than the minimal size. The minimal size is defined
+			by LOG_BUF_SHIFT kernel config parameter. There is
+			also CONFIG_LOG_CPU_MAX_BUF_SHIFT config parameter
+			that allows to increase the default size depending on
+			the number of CPUs. See init/Kconfig for more details.
+```
+
+前面已经完全初始化好了物理内存映射，及memblock物理内存分配器。这一步可以从memblock中分配物理内存，并通过__va转换为虚拟地址。
+
 ## 35
+
+```c
+	reserve_initrd();
+```
+
+判断是否需要把initrd搬移到别的地方。在memblock中分配物理内存。
 
 ## 36
 
-## 37
+```c
+	acpi_table_upgrade();
+```
 
-## 38
+在initrd中搜索`kernel/firmware/acpi/`路径下的文件，这个路径下的文件可以用来修正bios提供的ACPI表。亦或是测试ACPI表。从memblock申请内存，并把ACPI表从initrd拷贝到申请的内存中。
 
-## 39
+后续会使用BIOS及这里提取到的ACPI表。
+
+## 37* ACPI
+
+```c
+	/*
+	 * Parse the ACPI tables for possible boot-time SMP configuration.
+	 */
+	acpi_boot_table_init();
+```
+
+初始化ACPI。
+
+### 37.1 函数内部
+
+```c
+void __init acpi_boot_table_init(void)
+{
+    ...
+	/*
+	 * Initialize the ACPI boot-time table parser.
+	 */
+	if (acpi_table_init()) {
+		disable_acpi();
+		return;
+	}
+    acpi_table_parse(ACPI_SIG_BOOT, acpi_parse_sbf);
+    ...
+}
+```
+
+acpi_table_init函数会从bios或uefi中获取"RSDP"根，并解析根表，解析完会存放在一个数组里。并打印ACPI表信息。内核日志如下：
+
+```
+[    0.000000] ACPI: Early table checksum verification disabled
+[    0.000000] ACPI: RSDP 0x00000000000F05B0 000024 (v02 HPQOEM)
+[    0.000000] ACPI: XSDT 0x00000000772370A0 0000C4 (v01 HPQOEM SLIC-CPC 01072009 AMI  00010013)
+[    0.000000] ACPI: FACP 0x0000000077261638 00010C (v05 HPQOEM SLIC-CPC 01072009 AMI  00010013)
+[    0.000000] ACPI: DSDT 0x00000000772371F8 02A43D (v02 HPQOEM SLIC-CPC 01072009 INTL 20120913)
+[    0.000000] ACPI: FACS 0x0000000077BA3F80 000040
+[    0.000000] ACPI: APIC 0x0000000077261748 000084 (v03 HPQOEM SLIC-CPC 01072009 AMI  00010013)
+[    0.000000] ACPI: FPDT 0x00000000772617D0 000044 (v01 HPQOEM SLIC-CPC 01072009 AMI  00010013)
+[    0.000000] ACPI: FIDT 0x0000000077261818 00009C (v01 HPQOEM SLIC-CPC 01072009 AMI  00010013)
+[    0.000000] ACPI: MCFG 0x00000000772618B8 00003C (v01 HPQOEM SLIC-CPC 01072009 MSFT 00000097)
+[    0.000000] ACPI: HPET 0x00000000772618F8 000038 (v01 HPQOEM SLIC-CPC 01072009 AMI. 0005000B)
+[    0.000000] ACPI: SSDT 0x0000000077261930 00036D (v01 HPQOEM SLIC-CPC 00001000 INTL 20120913)
+[    0.000000] ACPI: LPIT 0x0000000077261CA0 000094 (v01 HPQOEM SLIC-CPC 00000000 MSFT 0000005F)
+[    0.000000] ACPI: SSDT 0x0000000077261D38 000248 (v02 HPQOEM SLIC-CPC 00000000 INTL 20120913)
+[    0.000000] ACPI: SSDT 0x0000000077261F80 002BAE (v02 HPQOEM SLIC-CPC 00001000 INTL 20120913)
+[    0.000000] ACPI: SSDT 0x0000000077264B30 000BE3 (v02 HPQOEM SLIC-CPC 00001000 INTL 20120913)
+[    0.000000] ACPI: DBGP 0x0000000077265718 000034 (v01 HPQOEM SLIC-CPC 00000000 MSFT 0000005F)
+[    0.000000] ACPI: DBG2 0x0000000077265750 000054 (v00 HPQOEM SLIC-CPC 00000000 MSFT 0000005F)
+[    0.000000] ACPI: SSDT 0x00000000772657A8 000618 (v02 HPQOEM SLIC-CPC 00000000 INTL 20120913)
+[    0.000000] ACPI: MSDM 0x0000000077265DC0 000055 (v03 HPQOEM SLIC-CPC 01072009 AMI  00010013)
+[    0.000000] ACPI: SSDT 0x0000000077265E18 00546C (v02 HPQOEM SLIC-CPC 00003000 INTL 20120913)
+[    0.000000] ACPI: UEFI 0x000000007726B288 000042 (v01 HPQOEM SLIC-CPC 00000000      00000000)
+[    0.000000] ACPI: SSDT 0x000000007726B2D0 000E73 (v02 HPQOEM SLIC-CPC 00003000 INTL 20120913)
+[    0.000000] ACPI: DMAR 0x000000007726C148 0000A8 (v01 HPQOEM SLIC-CPC 00000001 INTL 00000001)
+[    0.000000] ACPI: DBGP 0x000000007726C1F0 000034 (v01 HPQOEM SLIC-CPC 01072009 AMI  00010013)
+[    0.000000] ACPI: Local APIC address 0xfee00000
+```
+
+## 38* APIC
+
+```c
+	early_acpi_boot_init();
+```
+
+从ACPI表中获取"APIC"表，并取得lapic的地址，并检测不同oem的APIC驱动，注册lapic地址(设置固定映射)。
+
+内核实现了多个oem版本的APIC驱动，在内核源码`arch/x86/kernel/apic/`目录下，通过`apic_driver`宏来注册不同的APIC驱动。根据"APIC"表来获取当前的APIC驱动，赋值给apic变量。
+
+## 39* NUMA
+
+```c
+	initmem_init();
+```
+
+NUMA的初始化：
 
 ## 40
