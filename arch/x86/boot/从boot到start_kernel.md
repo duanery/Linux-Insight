@@ -19,7 +19,7 @@ boot_params结构定义在setup.bin内部。会把header.S中的头拷贝到boot
 
 安装gdt。
 
-开启包含模式。
+开启保护模式。
 
 跳入保护模式代码。cs会设置为__BOOT_CS，ds设置为\_\_BOOT_DS.此时还未启用分页。
 
