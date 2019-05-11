@@ -68,3 +68,8 @@ tracepoint跟踪接口，导出符号，内核如何使用接口*
 [1]: https://0xax.gitbooks.io/linux-insides/ "linux-insides"
 [2]: https://richardweiyang.gitbooks.io/kernel-exploring/	"kernel_exploring"
 
+# 排版约束
+
+1. 文章中提到的源码变量，统一使用*斜体*。全局变量**加粗**显示，局部变量不加粗。
+2. 文章中提到的函数名，统一在函数名后加'()'来标识。括号内不加函数的参数。
+3. 文章中提到的超过1行的源码，使用代码块引用。不超过一行的代码，使用行内引用。
