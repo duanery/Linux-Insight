@@ -737,7 +737,7 @@ numa_init()的核心函数是numa_register_memblks()，这个函数会把内存�
 
 ### 39.3 详细分析
 
-[numa初始化](arch/x86/mm/numa初始化.md)
+[numa初始化](../mm/numa初始化.md)
 
 ### 39.4 总结
 
@@ -771,7 +771,56 @@ numa初始化之后，就可以知道有哪些possible的numa节点，有哪些o
 
 ## 42
 
+```c
+#ifdef CONFIG_KVM_GUEST
+	kvmclock_init();
+#endif
+```
+
+TODO
+
 ## 43
+
+```c
+	x86_init.paging.pagetable_init();
+```
+
+x86_64系统结构下，会执行paging_init()函数。
+
+1. 执行稀疏内存初始化。
+2. zone和伙伴系统初始化。前面[39]已经执行过numa节点对象的初始化了，zone和伙伴系统初始化在每个numa节点下都会执行。
+
+### 43.1 简要分析
+
+```c
+void __init paging_init(void)
+{
+	sparse_memory_present_with_active_regions(MAX_NUMNODES);
+	sparse_init();
+
+	/*
+	 * clear the default setting with node 0
+	 * note: don't use nodes_clear here, that is really clearing when
+	 *	 numa support is not compiled in, and later node_set_state
+	 *	 will not set it back.
+	 */
+	node_clear_state(0, N_MEMORY);
+	if (N_MEMORY != N_NORMAL_MEMORY)
+		node_clear_state(0, N_NORMAL_MEMORY);
+
+	zone_sizes_init();
+}
+```
+
+sparse_init()执行稀疏内存初始化。
+
+zone_sizes_init()执行pg_data_t初始化、zone初始化、伙伴系统初始化。
+
+### 43.2 详细分析
+
+[稀疏内存初始化](../../../mm/sparse.md)
+
+[zone及伙伴系统初始化](../../../mm/free_area_init.md)
 
 ## 44
 
