@@ -42,7 +42,7 @@ void __init setup_arch(char **cmdline_p)
 	printk(KERN_INFO "Command line: %s\n", boot_command_line);
 ```
 
-打印内核命令行参数。在`x86_64_start_kernel`函数中，把内核命令行参数，从boot_params中拷贝到boot_command_line数组中，数组2048字节。
+打印内核命令行参数。在x86_64_start_kernel()函数中，把内核命令行参数，从boot_params中拷贝到*boot_command_line*数组中，数组2048字节。
 
 从内核日志可以分析到内核启动参数。
 
@@ -52,7 +52,7 @@ void __init setup_arch(char **cmdline_p)
 	early_trap_init();
 ```
 
-注册Debug和Breakpoint2个异常。把idt_descr加载到idt寄存器。之后只需要通过注册`中断门，陷阱门，系统中断门，系统陷阱门`就可以注册异常处理程序。
+注册Debug和Breakpoint2个异常。把***idt_descr***加载到idt寄存器。之后只需要通过注册`中断门，陷阱门，系统中断门，系统陷阱门`就可以注册异常处理程序。
 
 中断描述符初始化完成。
 
@@ -62,7 +62,7 @@ void __init setup_arch(char **cmdline_p)
 	early_cpu_init();
 ```
 
-早期cpu的初始化：cpu检测，判断cpu制造商，赋值this_cpu设备，读取cpu能力(cpuid)，初始化boot_cpu_data，this_cpu->c_early_init(c)，this_cpu->c_bsp_init(c)，fpu初始化等。
+早期cpu的初始化：cpu检测，判断cpu制造商，赋值this_cpu设备，读取cpu能力(cpuid)，初始化*boot_cpu_data*，this_cpu->c_early_init(c)，this_cpu->c_bsp_init(c)，fpu初始化等。
 
 ## 5
 
@@ -74,7 +74,7 @@ void __init setup_arch(char **cmdline_p)
 
 定义了`early_ioremap,early_memremap,early_memremap_ro,early_iounmap`这样的四个函数来操作。
 
-主要用于映射boot_params中指向的物理地址以访问数据结构。早期的物理地址的对等映射在`x86_64_start_kernel`函数中被清除了，所以不能直接访问了。
+主要用于映射boot_params中指向的物理地址以访问数据结构。早期的物理地址的对等映射在x86_64_start_kernel()函数中被清除了，所以不能直接访问了。
 
 ## 6
 
@@ -98,7 +98,7 @@ void __init setup_arch(char **cmdline_p)
 	setup_memory_map();
 ```
 
-调用`default_machine_specific_memory_setup`函数把boot_params中的e820数组拷贝到e820全局变量中。在内核日志中打印e820信息。
+调用default_machine_specific_memory_setup()函数把boot_params中的e820数组拷贝到***e820***全局变量中。在内核日志中打印e820信息。
 
 ```
 [    0.000000] e820: BIOS-provided physical RAM map:
@@ -129,7 +129,7 @@ void __init setup_arch(char **cmdline_p)
 	parse_setup_data();
 ```
 
-处理boot_params.hdr.setup_data数据，会调用`early_memremap`及`early_memunmap`来访问物理地址的数据。
+处理boot_params.hdr.setup_data数据，会调用early_memremap()及early_memunmap()来访问物理地址的数据。
 
 参考Boot Protocol中setup_data相关字段的介绍。
 
@@ -472,7 +472,7 @@ void __init init_mem_mapping(void)
 	probe_page_size_mask();
 ```
 
-`probe_page_size_mask()`探测cpu是否支持2M/1G的大页，以及Global TLB标志。
+probe_page_size_mask()探测cpu是否支持2M/1G的大页，以及Global TLB标志。
 
 ```c
 #ifdef CONFIG_X86_64
@@ -537,7 +537,7 @@ max_low_pfn = max_pfn;
 
 ### 31.2 疑问
 
-建立直接映射时，一定会分配4K字节的pud、pmd、pte来存放页表项。那么操作这些页表项使用的虚拟地址(通过alloc_low_page函数分配)也是通过__va得到的，访问这个虚拟地址会发生什么？
+建立直接映射时，一定会分配4K字节的pud、pmd、pte来存放页表项。那么操作这些页表项使用的虚拟地址(通过alloc_low_page()函数分配)也是通过__va得到的，访问这个虚拟地址会发生什么？
 
 在最后load_cr3之前，使用的是early_level4_pgt这个早期的临时页表。访问未映射的虚拟地址时，会发生缺页异常，在缺页异常处理程序内部会在early_level4_pgt上建立临时页表。所以可以访问__va得到的虚拟地址。
 
@@ -574,7 +574,7 @@ max_low_pfn = max_pfn;
 	setup_log_buf(1);
 ```
 
-如果配置了log_buf_len这个内核参数，就从memblock中分配一个缓冲区，存放printk打印的日志。
+如果配置了*log_buf_len*这个内核参数，就从memblock中分配一个缓冲区，存放printk打印的日志。
 
 ```
 	log_buf_len=n[KMG]	Sets the size of the printk ring buffer,
@@ -722,7 +722,7 @@ void __init x86_numa_init(void)
 
 最终会调用到x86_numa_init中。先分析`x86_acpi_numa_init`，然后再分析`numa_init`。
 
-x86_acpi_numa_init会调用acpi_numa_init，从acpi驱动中来获取numa的信息。numa的信息包含两部分：
+x86_acpi_numa_init()会调用acpi_numa_init，从acpi驱动中来获取numa的信息。numa的信息包含两部分：
 
 ```
 SRAT: Static Resource Affinity Table
@@ -731,9 +731,9 @@ SLIT: System Locality Information Table
 
 SRAT中包含cpu和内存资源与NUMA节点的亲和性信息。
 
-numa_init的核心函数是`numa_register_memblks`，这个函数会把内存亲和性信息转移到memblock上，并设置`node_possible_map,node_online_map`，并从每个NUMA节点的物理内存中分配类型为`pg_data_t`的对象，这个对象唯一的表示一个numa节点。
+numa_init()的核心函数是numa_register_memblks()，这个函数会把内存亲和性信息转移到memblock上，并设置`node_possible_map,node_online_map`，并从每个NUMA节点的物理内存中分配类型为`pg_data_t`的对象，这个对象唯一的表示一个numa节点。
 
-所有的pg_data_t类型的对象，存放在一个node_data的数组之中。`struct pglist_data *node_data[MAX_NUMNODES] __read_mostly;`通过`NODE_DATA(nid)`宏来访问每个numa节点对象。
+所有的pg_data_t类型的对象，存放在一个***node_data***的数组之中。`struct pglist_data *node_data[MAX_NUMNODES] __read_mostly;`通过`NODE_DATA(nid)`宏来访问每个numa节点对象。
 
 ### 39.3 详细分析
 
@@ -744,3 +744,46 @@ numa_init的核心函数是`numa_register_memblks`，这个函数会把内存亲
 numa初始化之后，就可以知道有哪些possible的numa节点，有哪些online的numa节点。以及为每个numa节点分配描述符。
 
 ## 40
+
+```c
+	reserve_crashkernel();
+```
+
+解析"crashkernel="内核参数，并在memblock中分配相应的物理内存。
+
+```
+	crashkernel=size[KMG][@offset[KMG]]
+			[KNL] Using kexec, Linux can switch to a 'crash kernel'
+			upon panic. This parameter reserves the physical
+			memory region [offset, offset + size] for that kernel
+			image. If '@offset' is omitted, then a suitable offset
+			is selected automatically. Check
+			Documentation/kdump/kdump.txt for further details.
+```
+
+## 41
+
+```c
+	memblock_find_dma_reserve();
+```
+
+从memblock中查找小于16M的物理内存中有多少页框是已经分配的，并赋值给*dma_reserve*变量。
+
+## 42
+
+## 43
+
+## 44
+
+## 45
+
+## 46
+
+## 47
+
+## 48
+
+## 49
+
+## 50
+

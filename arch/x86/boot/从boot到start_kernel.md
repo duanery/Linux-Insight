@@ -53,13 +53,13 @@ boot_params结构定义在setup.bin内部。会把header.S中的头拷贝到boot
 
 代码从`arch/x86/kernel/head_64.S`开始。
 
-1. 默认的early_level4_pgt会自带一个0xffffffff8000000虚拟地址到0-2G物理地址的映射。
+1. 默认的***early_level4_pgt***会自带一个0xffffffff8000000虚拟地址到0-2G物理地址的映射。
 
 2. 建立vmlinux所占用物理内存块的对等映射
 
 3. 修复0xffffffff8000000虚拟地址的映射，使其映射到vmlinux对应的物理内存上。
 
-4. 设置phys_base，vmlinux加载的物理地址-16M的位置。这个变量用于把0xffffffff8000000-0xffffffffffffffff范围内的虚拟地址转换为物理地址。
+4. 设置***phys_base***，vmlinux加载的物理地址-16M的位置。这个变量用于把0xffffffff8000000-0xffffffffffffffff范围内的虚拟地址转换为物理地址。
 
 5. 把early_level4_pgt载入cr3，建立新的页表
    - 新页表包含vmlinux物理地址的映射（KASLR随机选择的物理地址，或者0x100000）
@@ -87,7 +87,7 @@ boot_params结构定义在setup.bin内部。会把header.S中的头拷贝到boot
 
    RIP也会跳入到这块虚拟地址范围内了。
 
-7. 初始化栈，主要是把init_thread_union加载到rsp。
+7. 初始化栈，主要是把***init_thread_union***加载到rsp。
 
    ```asm
    /* Setup a boot time stack */
@@ -191,7 +191,7 @@ boot_params结构定义在setup.bin内部。会把header.S中的头拷贝到boot
 
    - 可以得出结论：gs的base值初始化为`irq_stack_union + __per_cpu_load`，就是初始化为percpu的起始区域。可以用%gs:的方式访问所有的percpu变量。
 
-10. 跳入x86_64_start_kernel函数中
+10. 跳入x86_64_start_kernel()函数中
 
    - 清除vmlinux物理地址的映射，清除的是对等映射。
 
