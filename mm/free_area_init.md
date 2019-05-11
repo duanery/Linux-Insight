@@ -89,7 +89,7 @@ void __paginginit free_area_init_node(int nid, unsigned long *zones_size,
 	pgdat->per_cpu_nodestats = NULL;
 ```
 
-对*pgdata*进行基本初始化。node_id，起始页框等。
+对*pgdat*进行基本初始化。node_id，起始页框等。
 
 ```c
 #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
