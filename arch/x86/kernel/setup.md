@@ -462,7 +462,7 @@ ffff880000000000 - ffffc7ffffffffff (=64 TB) direct mapping of all phys. memory
 
 物理内存的直接映射是从`ffff880000000000`地址开始的，最大64TB。如果开启KASLR，则起始地址存放在page_offset_base变量中。这是随机选择的一块虚拟地址。
 
-### 31.1 函数内部
+### 31.1 函数分析
 
 ```c
 void __init init_mem_mapping(void)
@@ -617,7 +617,7 @@ max_low_pfn = max_pfn;
 
 初始化ACPI。
 
-### 37.1 函数内部
+### 37.1 函数分析
 
 ```c
 void __init acpi_boot_table_init(void)
@@ -681,6 +681,66 @@ acpi_table_init函数会从bios或uefi中获取"RSDP"根，并解析根表，解
 	initmem_init();
 ```
 
-NUMA的初始化：
+NUMA的初始化：在CONFIG_NUMA=y的情况下，会在这里初始化numa。
+
+### 39.1 启动参数
+
+```
+NUMA
+
+  numa=off	Only set up a single NUMA node spanning all memory.
+
+  numa=noacpi   Don't parse the SRAT table for NUMA setup
+
+  numa=fake=<size>[MG]
+		If given as a memory unit, fills all system RAM with nodes of
+		size interleaved over physical nodes.
+
+  numa=fake=<N>
+		If given as an integer, fills all system RAM with N fake nodes
+		interleaved over physical nodes.
+```
+
+### 39.2 简要分析
+
+```c
+void __init initmem_init(void)
+{
+	x86_numa_init();
+}
+void __init x86_numa_init(void)
+{
+	if (!numa_off) {
+#ifdef CONFIG_ACPI_NUMA
+		if (!numa_init(x86_acpi_numa_init))
+			return;
+#endif
+    ...
+    }
+}
+```
+
+最终会调用到x86_numa_init中。先分析`x86_acpi_numa_init`，然后再分析`numa_init`。
+
+x86_acpi_numa_init会调用acpi_numa_init，从acpi驱动中来获取numa的信息。numa的信息包含两部分：
+
+```
+SRAT: Static Resource Affinity Table
+SLIT: System Locality Information Table
+```
+
+SRAT中包含cpu和内存资源与NUMA节点的亲和性信息。
+
+numa_init的核心函数是`numa_register_memblks`，这个函数会把内存亲和性信息转移到memblock上，并设置`node_possible_map,node_online_map`，并从每个NUMA节点的物理内存中分配类型为`pg_data_t`的对象，这个对象唯一的表示一个numa节点。
+
+所有的pg_data_t类型的对象，存放在一个node_data的数组之中。`struct pglist_data *node_data[MAX_NUMNODES] __read_mostly;`通过`NODE_DATA(nid)`宏来访问每个numa节点对象。
+
+### 39.3 详细分析
+
+[numa初始化](arch/x86/mm/numa初始化.md)
+
+### 39.4 总结
+
+numa初始化之后，就可以知道有哪些possible的numa节点，有哪些online的numa节点。以及为每个numa节点分配描述符。
 
 ## 40

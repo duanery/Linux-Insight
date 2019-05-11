@@ -117,7 +117,9 @@ int __init acpi_numa_init(void)
 
 会在acpi中搜索**SRAT**结构，然后调用`acpi_parse_processor_affinity`解析cpu亲和性相关的表，调用`acpi_parse_x2apic_affinity`解析x2apic亲和性相关的表，以及调用`acpi_parse_memory_affinity`解析内存亲和性相关的表。我们重点关注内存亲和性相关的内容。
 
-内存亲和性指定了（内存区域，numa节点）这样的关联信息。`acpi_parse_memory_affinity`会调用`acpi_parse_memory_affinity_init`，进而调用`numa_add_memblk`把内存亲和性信息传递出去。具体的内存亲和性信息被加入了numa_meminfo结构中。
+### 内存与NUMA
+
+内存亲和性指定了（内存区域start - end，numa节点）这样的关联信息。`acpi_parse_memory_affinity`会调用`acpi_numa_memory_affinity_init`，进而调用`numa_add_memblk`把内存亲和性信息传递出去。具体的内存亲和性信息被加入了numa_meminfo结构中。
 
 我们回到`arch/x86/mm/numa.c`的`numa_init`函数中，看看`numa_register_memblks`
 
@@ -142,3 +144,6 @@ static int __init numa_register_memblks(struct numa_meminfo *mi)
 
 通过`memblock_set_node`，最终numa_meminfo中的内存亲和性信息被转嫁到了memblock模块上。memblock是内核启动初期bootmem分配器，memblock也负责管理numa节点与内存的对应关系。
 
+### CPU与NUMA
+
+apicid亲和性指定了（apic_id，numa节点）这样的关联关系。`acpi_parse_processor_affinity`或`acpi_parse_x2apic_affinity`最终都会调用到`set_apicid_to_node`把apicid亲和性信息传递出去。最终会存放在__apicid_to_node数组里。数组下标是apicid，值是numa节点。
