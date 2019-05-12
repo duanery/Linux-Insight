@@ -822,13 +822,145 @@ zone_sizes_init()执行pg_data_t初始化、zone初始化、伙伴系统初始�
 
 [zone及伙伴系统初始化](../../../mm/free_area_init.md)
 
+### 43.3 总结
+
+这之后，所有的numa节点、zone、伙伴系统、struct page都初始化完成了。
+
 ## 44
+
+```c
+	kasan_init();
+```
+
+TODO
 
 ## 45
 
+```c
+	map_vsyscall();
+```
+
+根据"vsyscall="内核参数，把vsyscall页固定映射到VSYSCALL_PAGE(0xffffffffff600000)。-10M。
+
+```
+	vsyscall=	[X86-64]
+			Controls the behavior of vsyscalls (i.e. calls to
+			fixed addresses of 0xffffffffff600x00 from legacy
+			code).  Most statically-linked binaries and older
+			versions of glibc use these calls.  Because these
+			functions are at fixed addresses, they make nice
+			targets for exploits that can control RIP.
+
+			emulate     [default] Vsyscalls turn into traps and are
+			            emulated reasonably safely.
+
+			native      Vsyscalls are native syscall instructions.
+			            This is a little bit faster than trapping
+			            and makes a few dynamic recompilers work
+			            better than they would in emulation mode.
+			            It also makes exploits much easier to write.
+
+			none        Vsyscalls don't work at all.  This makes
+			            them quite hard to use for exploits but
+			            might break your system.
+```
+
 ## 46
 
-## 47
+```c
+	early_quirks();
+```
+
+修复有bug的pci设备。
+
+## 47* BOOT FACP APIC HPET
+
+```c
+	acpi_boot_init();
+```
+
+解析ACPI表中的：
+
+```
+"BOOT"	/* Simple Boot Flag Table */
+"FACP"	/* Fixed ACPI Description Table */
+"APIC"	/* Multiple APIC Description Table */
+"HPET"	/* High Precision Event Timer table */
+```
+
+### 47.1 APIC解析的函数调用链
+
+```
+acpi_boot_init() ->
+	acpi_process_madt() ->
+		acpi_parse_madt_lapic_entries() ->
+			acpi_parse_lapic()/acpi_parse_x2apic() ->
+				acpi_register_lapic() ->
+					generic_processor_info() {
+						cpu = allocate_logical_cpuid(apicid);  //--1--
+						early_per_cpu(x86_cpu_to_apicid, cpu) = apicid;  //--2--
+						set_cpu_possible(cpu, true);  //--3--
+						set_cpu_present(cpu, true);  //--4--
+					}
+		acpi_parse_madt_ioapic_entries() ->
+			acpi_parse_ioapic() ->
+				mp_register_ioapic() {
+					idx = find_free_ioapic_entry();  //--5--
+					ioapics[idx].mp_config.apicaddr = address;  //--6--
+					set_fixmap_nocache(FIX_IO_APIC_BASE_0 + idx, address);  //--7--
+					ioapics[idx].mp_config.apicid = io_apic_unique_id(idx, id);
+					gsi_cfg->gsi_base = gsi_base;  //--8--
+                    gsi_cfg->gsi_end = gsi_end;
+				}
+```
+
+1. 根据apicid分配逻辑cpuid。boot cpu的cpuid始终是0，其余逻辑cpu从*cpuid_to_apicid[]*数组中分配。
+
+2. 设置x86_cpu_to_apicid这个每cpu变量。可以根据cpuid转换为apicid，进一步可以有apicid再转换为nid(numa节点)，以完成CPU到numa节点的转换。
+
+3. 设置cpu可能存在标志。
+
+4. 设置cpu存在标志。在smp_init()中会根据已存在的cpu来逐个开启。
+
+5. 在*ioapic[]*数组中分配空闲的ioapic项。
+
+6. 设置ioapic的物理地址。IOAPIC手册：[82093AA IOAPIC](apic/ioapic.pdf)
+
+   - ```
+     [    0.000000] IOAPIC[0]: apic_id 1, version 32, address 0xfec00000, GSI 0-23
+     [    0.000000] IOAPIC[1]: apic_id 2, version 32, address 0xfec01000, GSI 24-47
+     [    0.000000] IOAPIC[2]: apic_id 3, version 32, address 0xfec40000, GSI 48-71
+     ```
+
+   - 从内核日志可以看到有3个IOAPIC，地址分别在0xfec00000，0xfec01000，0xfec40000
+
+7. 设置ioapic的固定映射。通过固定映射的虚拟地址来访问每一个ioapic。
+8. Global System Interrupt的起始地址。
+
+IOAPIC寄存器的访问：通过IOREGSEL和IOWIN这两个寄存器来间接访问，这两个寄存器映射到特定的物理地址上(memory address specified by the APICBASE Register located in the PIIX3)。参考：<https://wiki.osdev.org/IOAPIC>
+
+### 47.2 HPET解析的函数调用链
+
+```
+acpi_boot_init() ->
+	acpi_parse_hpet() {
+        hpet_address = hpet_tbl->address.address;  //-1-
+        hpet_blockid = hpet_tbl->sequence;  //-2-
+        hpet_res = alloc_bootmem(sizeof(*hpet_res) + HPET_RESOURCE_NAME_SIZE);  //-3-
+        hpet_res->start = hpet_address;
+		hpet_res->end = hpet_address + (1 * 1024) - 1;
+	}
+```
+
+1. 获取HPET寄存器组的物理地址。
+2. TODO
+3. 申请*hpet_res*资源(struct resource)，并初始化。通过`cat /proc/iomem | grep HPET`可以看到。
+
+HPET寄存器的访问：通过***hpet_address***这个物理地址直接访问。内核在访问时需要通过`ioremap_nocache`把物理地址映射为虚拟地址才能访问。参考：<https://wiki.osdev.org/HPET>
+
+### 47.3 总结
+
+通过ACPI查找并初始化lapic、ioapic、hpet。查找lapic的主要作用是为了完成lapic到cpuid的相互转换。
 
 ## 48
 
