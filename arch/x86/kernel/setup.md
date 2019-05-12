@@ -350,7 +350,7 @@ Their order is preserved but their base will be offset early at boot time.
 	check_x2apic();
 ```
 
-获取bios配置的x2APIC的情况。
+获取bios配置的x2APIC的情况。设置`x2apic_mode = 1; x2apic_state = X2APIC_ON;`
 
 ## 24
 
@@ -779,7 +779,7 @@ numa初始化之后，就可以知道有哪些possible的numa节点，有哪些o
 
 TODO
 
-## 43
+## 43* page初始化
 
 ```c
 	x86_init.paging.pagetable_init();
@@ -918,9 +918,9 @@ acpi_boot_init() ->
 
 2. 设置x86_cpu_to_apicid这个每cpu变量。可以根据cpuid转换为apicid，进一步可以有apicid再转换为nid(numa节点)，以完成CPU到numa节点的转换。
 
-3. 设置cpu可能存在标志。
+3. 设置cpu可能存在标志(possible)。
 
-4. 设置cpu存在标志。在smp_init()中会根据已存在的cpu来逐个开启。
+4. 设置cpu存在标志(present)。在smp_init()中会根据已存在的cpu来逐个开启。
 
 5. 在*ioapic[]*数组中分配空闲的ioapic项。
 
@@ -964,7 +964,30 @@ HPET寄存器的访问：通过***hpet_address***这个物理地址直接访问�
 
 ## 48
 
+```c
+	init_apic_mappings();
+```
+
+初始化*boot_cpu_physical_apicid*变量。
+
 ## 49
+
+```c
+	prefill_possible_map();
+```
+
+设置可能存在的cpu图。如果允许热插拔cpu，意味着有些cpu在启动时被禁用了，但是可能存在的。这些cpu也设置成possible的`set_cpu_possible`。
 
 ## 50
 
+```c
+	init_cpu_to_node();
+```
+
+对每个可能存在的CPU，都通过cpu--[47.1]-->lapic--[39]-->node转换成numa节点。并设置x86_cpu_to_node_map这个早期的percpu变量。最终等待percpu内存区域初始化完成后(setup_per_cpu_areas()函数)，可以通过numa_node这个percpu变量之间读取cpu的numa节点。
+
+第[47.1]步完成了cpu跟lapic的关联，第[39]步完成了lapic和numa节点的关联。
+
+这之后，CPU和numa节点的对应关系已经完成早期的初始化。
+
+## 51
