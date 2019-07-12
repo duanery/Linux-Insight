@@ -35,6 +35,8 @@ boot_params结构定义在setup.bin内部。会把header.S中的头拷贝到boot
 6. 开启分页。
 7. 跳入64位模式。cs会重新设置为__KERNEL_CS，指令IP会使用64位虚拟地址。
 
+为什么进入到PAE，再到long mode后，才开启分页？因为保护模式、PAE、longmode的分页都不一样，所以即使在保护模式创建了分页到longmode也不能用，所以到最后才开启分页。
+
 ## 64位模式
 
 64位模式代码从`arch/x86/boot/compressed/head_64.S`文件的`startup_64`开始。
