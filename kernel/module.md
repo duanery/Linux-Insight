@@ -7,14 +7,129 @@
 >
 > Linux爱好者
 
-从模块编译到模块加载。
+从模块编译、安装到模块加载。
 
 ## 一、使用方法
 
-- insmod 模块加载
+### 模块命令
 
-- rmmod 模块移除
-- modinfo 模块信息
+| 命令                   | 介绍                                       |
+| ---------------------- | ------------------------------------------ |
+| /usr/bin/kmod          | 模块管理命令，包含list,load,unload模块     |
+| /usr/sbin/depmod       | 为modprobe输出一个模块依赖关系列表         |
+| /usr/sbin/insmod       | 插入模块                                   |
+| /usr/sbin/lsmod        | 列出模块                                   |
+| /usr/sbin/modinfo      | 查看模块信息                               |
+| /usr/sbin/modprobe     | 加载模块，会根据模块依赖关系加载一系列模块 |
+| /usr/sbin/rmmod        | 移除模块                                   |
+| /usr/sbin/weak-modules |                                            |
+
+### 模块用法
+
+一个简单的模块：包含了模块的各种用途。
+
+#### hello模块
+
+''hello.c" 源码文件，编译后会得到hello.ko模块：
+
+```c
+//hello.c
+#include<linux/init.h>
+#include<linux/module.h>
+#include <linux/pci.h>
+
+static int hello; 
+module_param(hello, int, 0644);
+static struct module *this = THIS_MODULE;
+static const struct pci_device_id hello_pci_tbl[] = {
+	{ 0x8086, 0x7010, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ },
+};
+
+void hello_export()
+{
+	printk("export by %s\n", this->name);
+}
+EXPORT_SYMBOL(hello_export);
+
+static int hello_init(void)
+{
+	printk("hello world\n");
+	return 0;
+}
+static void hello_exit(void)
+{
+	printk("goodbye\n");
+}
+module_init(hello_init);
+module_exit(hello_exit);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("duanery");
+MODULE_DEVICE_TABLE(pci, hello_pci_tbl);
+MODULE_DESCRIPTION("Hello World!");
+```
+
+这是一个最简单的模块，包含了导出符号，device_table，模块参数等等。
+
+#### hello_dep模块
+
+"hello_dep.c" 源码文件，编译后得到hello_dep.ko模块：
+
+```c
+//hello_dep.c
+#include<linux/init.h>
+#include<linux/module.h>
+extern void hello_export();
+static int hello_dep_init(void)
+{
+	hello_export();
+	return 0;
+}
+static void hello_dep_exit(void)
+{
+	printk("goodbye\n");
+}
+
+module_init(hello_dep_init);
+module_exit(hello_dep_exit);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("duanery");
+MODULE_DESCRIPTION("Hello World!");
+```
+
+调用hello模块中导出的函数hello_export()。
+
+#### 编译脚本
+
+```makefile
+#Makefile
+src_c := $(filter-out %.mod.c,$(notdir $(wildcard $(src)/*.c)))
+
+hostprogs-y := 
+always := $(hostprogs-y)
+
+hostprogs_c := $(patsubst %,%.c,$(hostprogs-y))
+
+obj_c := $(filter-out $(hostprogs_c), $(src_c))
+obj-m := $(patsubst %.c,%.o,$(obj_c))
+
+PHONE += modules
+modules:
+modules clean modules_install help:
+	$(MAKE) -C /lib/modules/$(shell uname -r)/build M=$(shell pwd) $@
+```
+
+键入`make`编译。
+
+键入`make clean`清理。
+
+键入`make modules_install`安装模块。
+
+键入`modprobe hello_dep`插入模块到内核。
+
+后续会根据这个例子，讲解模块编译、安装、加载。
 
 ## 二、模块编译
 
@@ -28,7 +143,17 @@
 
   对模块内导出的符号进行crc校验。未导出的符号无crc。
 
-### 模块宏定义引入的section
+### section
+
+在模块加载时会查看模块内所有特殊功能的section，并与内核建立联系。例如：
+
+1. 模块内定义的percpu变量，会在模块加载分配内存空间。
+2. 模块内使用copy_from_user等类似的宏，会建立异常跳转表，也需要特殊处理，在内核收到异常时能判断在哪个模块的上下文中。
+3. 模块内使用的static_key，也需要特殊处理。
+
+分析哪些宏会向模块内引入哪些section会很有意义。
+
+#### 1. 模块宏定义引入的section
 
 - EXPORT_SYMBOL
 
@@ -105,38 +230,29 @@
 
   - 把cleanup_module函数设置别名"exitfn"
 
-- 一个例子
+- 。。。随着内核版本更新会有更多。
+
+- 看看hello模块的信息，大部分宏的信息可以通过modinfo查看。
 
   ```
-  [root]# modinfo ata_piix
-  filename:       /lib/modules/3.10.0-514.26.2.el7.x86_64/kernel/drivers/ata/ata_piix.ko
-  version:        2.13
+  [root@localhost module]# modinfo hello
+  filename:       /lib/modules/3.10.0-957.el7.x86_64/extra/hello.ko
+  description:    Hello World!
+  author:         duanery
   license:        GPL
-  description:    SCSI low-level driver for Intel PIIX/ICH ATA controllers
-  author:         Andre Hedrick, Alan Cox, Andrzej Krzysztofowicz, Jeff Garzik
-  rhelversion:    7.3
-  srcversion:     BECF828A30FD905EC05478B
-  alias:          pci:v00008086d000023A6sv*sd*bc*sc*i*
-  alias:          pci:v00008086d00000F21sv*sd*bc*sc*i*
-  alias:          pci:v00008086d00002828sv*sd*bc*sc*i*
-  alias:          pci:v00008086d00002828sv0000106Bsd000000A3bc*sc*i*
-  alias:          pci:v00008086d00002828sv0000106Bsd000000A1bc*sc*i*
-  alias:          pci:v00008086d00002828sv0000106Bsd000000A0bc*sc*i*
-  alias:          pci:v00008086d00002825sv*sd*bc*sc*i*
-  depends:        libata
-  intree:         Y
-  vermagic:       3.10.0-514.26.2.el7.x86_64 SMP mod_unload modversions 
-  signer:         CentOS Linux kernel signing key
-  sig_key:        61:8F:5D:DF:77:2E:4B:E8:25:FB:1B:B0:95:91:86:27:24:ED:1E:97
-  sig_hashalgo:   sha256
-  parm:           prefer_ms_hyperv:Prefer Hyper-V paravirtualization drivers instead of ATA, 0 - Use ATA drivers, 1 (Default) - Use the paravirtualization drivers. (int)
+  retpoline:      Y
+  rhelversion:    7.6
+  srcversion:     56C405DE508ED8E3C5E62DF
+  alias:          pci:v00008086d00007010sv*sd*bc*sc*i*
+  depends:        
+  vermagic:       3.10.0-957.el7.x86_64 SMP mod_unload modversions
   ```
 
-### 模块调用内核接口引入的section
+#### 2.模块调用内核接口引入的section
 
+TODO
 
-
-### .mod.c中引入的section
+#### 3.".mod.c"中引入的section
 
 - .gnu.linkonce.this_module：这个section内唯一存放了一个struct module _\_this\_module变量。
 - __versions：存放由当前模块调用的别的模块导出函数的版本信息。
@@ -233,8 +349,8 @@ endif
       调用`scripts/genksyms/genksyms`命令来生成，具体生成比较复杂，详细分析：TODO。但可以看看生成的.tmp_\<file>.ver文件：
 
       ```
-      [root]# cat .tmp_pit.ver
-      __crc_pit_status = 0x3bf3bb0d ;
+      [root@localhost module]# cat .tmp_hello.ver 
+      __crc_hello_export = 0x33a9e426 ;
       ```
 
       经过推理：`scripts/genksyms/genksyms`这个命令应该是调用词法分析器对c语言源码进行分析，把导出的函数拆分为语法树，对语法树进行crc计算。因此在不改变函数的逻辑的情况下crc值是一直相同的。
@@ -277,7 +393,7 @@ endif
 **example**
 
 ```c
-[root@VM_127_90_centos wrmsr_gp]# cat hello.mod.c 
+[root@localhost module]# cat hello.mod.c 
 #include <linux/module.h>
 #include <linux/vermagic.h>
 #include <linux/compiler.h>
@@ -286,30 +402,38 @@ MODULE_INFO(vermagic, VERMAGIC_STRING);  //1
 
 struct module __this_module
 __attribute__((section(".gnu.linkonce.this_module"))) = {  //2
-        .name = KBUILD_MODNAME,
-        .init = init_module,
+	.name = KBUILD_MODNAME,
+	.init = init_module,
 #ifdef CONFIG_MODULE_UNLOAD
-        .exit = cleanup_module,
+	.exit = cleanup_module,
 #endif
-        .arch = MODULE_ARCH_INIT,
+	.arch = MODULE_ARCH_INIT,
 };
 
-static const struct modversion_info ____versions[]
+static const struct modversion_info ____versions[]  //3
 __used
-__attribute__((section("__versions"))) = {  //3
-        { 0x28950ef1, __VMLINUX_SYMBOL_STR(module_layout) },
-        { 0x27e1a049, __VMLINUX_SYMBOL_STR(printk) },
-        { 0xbdfb6dbb, __VMLINUX_SYMBOL_STR(__fentry__) },
+__attribute__((section("__versions"))) = {
+	{ 0x28950ef1, __VMLINUX_SYMBOL_STR(module_layout) },
+	{ 0x15692c87, __VMLINUX_SYMBOL_STR(param_ops_int) },
+	{ 0x27e1a049, __VMLINUX_SYMBOL_STR(printk) },
+	{ 0xbdfb6dbb, __VMLINUX_SYMBOL_STR(__fentry__) },
 };
 
-static const char __module_depends[]  //4
+static const char __module_depends[]
 __used
-__attribute__((section(".modinfo"))) =
+__attribute__((section(".modinfo"))) =  //4
 "depends=";
 
 MODULE_ALIAS("pci:v00008086d00007010sv*sd*bc*sc*i*");  //5
 
-MODULE_INFO(srcversion, "C64FE0C55C1EA4FCF35CEEC");  //6
+MODULE_INFO(srcversion, "9DDB9793EE1E6086188E19A");  //6
+MODULE_INFO(rhelversion, "7.6");
+#ifdef RETPOLINE
+	MODULE_INFO(retpoline, "Y");
+#endif
+#ifdef CONFIG_MPROFILE_KERNEL
+	MODULE_INFO(mprofile, "Y");
+#endif
 ```
 
 modpost为其中一个模块生成出.mod.c文件。
@@ -332,7 +456,75 @@ Module.symvers文件在`/lib/modules/$(uname -r)/build/`目录。
 
 模块签名：TODO
 
+## 三、模块安装
 
+### modules_install
 
-## 三、模块加载
+键入`make modules_install`进行模块安装：
 
+主Makefile中的安装入口
+
+```makefile
+MODLIB	= $(INSTALL_MOD_PATH)/lib/modules/$(KERNELRELEASE)
+modules_install: _emodinst_ _emodinst_post
+
+install-dir := $(if $(INSTALL_MOD_DIR),$(INSTALL_MOD_DIR),extra)
+PHONY += _emodinst_
+_emodinst_:
+	$(Q)mkdir -p $(MODLIB)/$(install-dir)
+	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.modinst
+
+PHONY += _emodinst_post
+_emodinst_post: _emodinst_
+	$(call cmd,depmod)
+```
+
+依赖于`_emodinst_及_emodinst_post`；
+
+\_emodinst\_:
+
+1. 创建/lib/modules/$(uname -r)/extra目录
+
+2. 调用Makefile.modinst安装模块
+
+   ```makefile
+   __modules := $(sort $(shell grep -h '\.ko$$' /dev/null $(wildcard $(MODVERDIR)/*.mod)))
+   modules := $(patsubst %.o,%.ko,$(wildcard $(__modules:.ko=.o)))
+   PHONY += $(modules)
+   __modinst: $(modules)
+   	@:
+   
+   # Don't stop modules_install if we can't sign external modules.
+   quiet_cmd_modules_install = INSTALL $@
+         cmd_modules_install = \
+       mkdir -p $(2) ; \
+       cp $@ $(2) ; \
+       $(mod_strip_cmd) $(2)/$(notdir $@) ; \
+       $(mod_sign_cmd) $(2)/$(notdir $@) $(patsubst %,|| true,$(KBUILD_EXTMOD)) && \
+       $(mod_compress_cmd) $(2)/$(notdir $@)
+   
+   # Modules built outside the kernel source tree go into extra by default
+   INSTALL_MOD_DIR ?= extra
+   ext-mod-dir = $(INSTALL_MOD_DIR)$(subst $(patsubst %/,%,$(KBUILD_EXTMOD)),,$(@D))
+   
+   modinst_dir = $(if $(KBUILD_EXTMOD),$(ext-mod-dir),kernel/$(@D))
+   
+   $(modules):
+   	$(call cmd,modules_install,$(MODLIB)/$(modinst_dir))
+   ```
+
+   1. 先获取所有安装的模块名。
+   2. 调用cmd_modules_install进行安装。主要是cp命令。分2种情况，如果安装的是内核源码树中的模块，会安装到`/lib/modules/$(uname -r)/kernel/`目录下。如果安装的是外部模块，会安装到`/lib/modules/$(uname -r)/extra/`目录下。
+
+_emodinst_post:
+
+1. 调用depmod。
+
+### 总结
+
+1. 模块安装主要是知道模块安装的目录：`/lib/modules/$(uname -r)/kernel/`或`/lib/modules/$(uname -r)/extra/`
+2. 模块安装后会调用depmod进行模块依赖处理。使用modprobe就可以直接加载有多重依赖关系的模块。
+
+## 四、模块加载
+
+运行`insmod hello`或`modprobe hello_dep`就可以直接加载模块。
