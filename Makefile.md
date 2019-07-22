@@ -294,9 +294,105 @@ headers_install.sh脚本内部主要是把内核头文件中不必要的宏定�
 
 # kbuild Makefile
 
+主要是指Makefile.build中的规则。
+
 ## kbuild
 
-TODO
+### 编译出.o文件
+
+```makefile
+# Built-in and composite module parts
+$(obj)/%.o: $(src)/%.c $(recordmcount_source) $(objtool_obj) FORCE
+	$(call cmd,force_checksrc)
+	$(call if_changed_rule,cc_o_c)
+```
+
+.o文件是从.c文件编译处理，`$(call if_changed_rule,cc_o_c)`指出编译出.o的命令是`rule_c_o_c`.
+
+```makefile
+define rule_cc_o_c
+	$(call echo-cmd,checksrc) $(cmd_checksrc)			  \
+	$(call cmd_and_fixdep,cc_o_c)					  \
+	$(cmd_modversions_c)						  \
+	$(cmd_objtool)						          \
+	$(call echo-cmd,record_mcount) $(cmd_record_mcount)
+endef
+```
+
+总共有4个关键部分组成：(CONFIG_MODVERSIONS=y)
+
+- ***cmd_cc_o_c***
+
+  ```makefile
+  cmd_cc_o_c = $(CC) $(c_flags) -c -o $(@D)/.tmp_$(@F) $<
+  ```
+
+  调用gcc命令编译出.tmp_file.o文件。这是一个临时.o文件。
+
+- ***cmd_modversions_c***
+
+  ```makefile
+  cmd_modversions_c =								\
+  	if $(OBJDUMP) -h $(@D)/.tmp_$(@F) | grep -q __ksymtab; then		\
+  		$(call cmd_gensymtypes_c,$(KBUILD_SYMTYPES),$(@:.o=.symtypes))	\
+  		    > $(@D)/.tmp_$(@F:.o=.ver);					\
+  										\
+  		$(LD) $(LDFLAGS) -r -o $@ $(@D)/.tmp_$(@F) 			\
+  			-T $(@D)/.tmp_$(@F:.o=.ver);				\
+  		rm -f $(@D)/.tmp_$(@F) $(@D)/.tmp_$(@F:.o=.ver);		\
+  	else									\
+  		mv -f $(@D)/.tmp_$(@F) $@;					\
+  	fi;
+  ```
+
+  这条命令，判断.tmp_file.o文件是否有`__ksymtab`section，有则意味着.c源码文件中有使用EXPORT_SYMBOL导出符号。如果有导出符号，则调用`cmd_gensymtypes_c`命令计算导出符号的crc值，并输出到.tmp_file.ver文件，然后把该文件再链接到.tmp_file.o文件，并输出file.o文件。
+
+  ```makefile
+  # Makefile
+  GENKSYMS	= scripts/genksyms/genksyms
+  # Makefile.build
+  cmd_gensymtypes_c =                                                         \
+      $(CPP) -D__GENKSYMS__ $(c_flags) $< |                                   \
+      $(GENKSYMS) $(if $(1), -T $(2))                                         \
+       $(patsubst y,-s _,$(CONFIG_HAVE_UNDERSCORE_SYMBOL_PREFIX))             \
+       $(if $(KBUILD_PRESERVE),-p)                                            \
+       -r $(firstword $(wildcard $(2:.symtypes=.symref) /dev/null))
+  ```
+
+  `cmd_gensymtypes_c`是调用gcc的预处理器，对.c文件进行预处理，打开`__GENKSYMS__`宏。然后调用`genksyms`命令处理预处理过的.c文件，会对.c进行语法分析，对分析过的语法树计算crc值。因此crc值包含的是函数的逻辑部分。
+
+- ***cmd_objtool***
+
+  TODO
+
+- ***cmd_record_mcount***
+
+  ```makefile
+  #Makefile
+  CC_FLAGS_FTRACE := -pg
+  # Makefile.build
+  ifdef CONFIG_FTRACE_MCOUNT_RECORD
+  sub_cmd_record_mcount =					\
+  	if [ $(@) != "scripts/mod/empty.o" ]; then	\
+  		$(objtree)/scripts/recordmcount $(RECORDMCOUNT_FLAGS) "$(@)";	\
+  	fi;
+  cmd_record_mcount =						\
+  	if [ "$(findstring $(CC_FLAGS_FTRACE),$(_c_flags))" =	\
+  	     "$(CC_FLAGS_FTRACE)" ]; then			\
+  		$(sub_cmd_record_mcount)			\
+  	fi;
+  endif
+  ```
+
+  主要用于ftrace。首先识别编译选项中是否有"-pg"选项，如有则调用`scripts/recordmcount`命令处理file.o对象文件。
+
+  `recordmcount`命令会在.o文件的末尾追加`__mcount_loc及.rela__mcount_loc`两个section。其中`.rela__mcount_loc`是对`__mcount_loc`的重定位section，会在.o文件链入vmlinux之后进行重定位操作，重定位会把所有`call mcount`的指令地址写入`__mcount_loc`section中。
+
+  为什么能识别的所有mcount调用的指令地址，因为recordmcount命令会解析.o文件中所有"SHT_RELA"类型的section，看这些section中的重定位项，哪些引用的是mcount符号，然后根据重定位项的r_offset字段得到`call mcount`指令的地址，再以重定位的规则写入`__mcount_loc及.rela__mcount_loc`这两个section中。在`.rela__mcount_loc`被重定位时，刚好能够把`call mcount`的指令地址写入`__mcount_loc`section中。
+
+  如果.o文件最终链接到模块中，则对`.rela__mcount_loc`中的每个重定位项进行处理是在模块加载时进行。结果是一样的，会在模块的`__mcount_loc`中写入记录所有`call mcount`的指令地址。
+
+  最终`__mcount_loc`会在ftrace模块中被处理，所有`call mcount`都会被替换为`nop`指令。
 
 ### vmlinux.lds
 
