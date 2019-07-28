@@ -41,6 +41,9 @@ static const struct x86_emulate_ops emulate_ops = {
 
 static int decode_insn(void *insn)
 {
+    if(unlikely(!ctxt))
+        return EMULATION_FAILED;
+    
     ctxt->eip = (unsigned long)insn;
     ctxt->mode = X86EMUL_MODE_PROT64;
     ctxt->interruptibility = 0;
@@ -798,9 +801,17 @@ static __unused void objdump_test(void)
 
 static int objdump_init(void)
 {
+    struct module *kvm_module = find_module("kvm");
+    if(!kvm_module) {
+        printk(KERN_NOTICE "[%s]: not fount kvm module.\n", THIS_MODULE->name);
+        return -1;
+    }
+    ref_module(THIS_MODULE, kvm_module);
+    
     _x86_decode_insn = (void *)kallsyms_lookup_name("x86_decode_insn");
     if(!_x86_decode_insn)
-        return 0;
+        return -1;
+    
     ctxt = kmalloc(sizeof(*ctxt), GFP_KERNEL|__GFP_ZERO);
     if(!ctxt) return 0;
     ctxt->ops = &emulate_ops;
@@ -819,4 +830,4 @@ module_exit(objdump_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("duanery");
-MODULE_DESCRIPTION("objdump: disassembler kernel function");
+MODULE_DESCRIPTION("objdump: disassemble kernel function");
