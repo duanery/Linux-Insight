@@ -72,6 +72,8 @@ pagint_init()最终会调用到zone_size_init()函数。zone_size_init()函数�
 
    核心的函数是free_area_init_node();
 
+   之后会通过node_set_state()和check_for_memory()设置`node_state[N_MEMORY]`和`node_state[N_NORMAL_MEMORY]`表示相应的numa节点是否存在内存和正常内存(非高端内存，非可移动内存)，之后的内核代码会多次使用这些信息。
+
 ## free_area_init_node()
 
 该函数对一个numa节点(pg_data_t)进行初始化。

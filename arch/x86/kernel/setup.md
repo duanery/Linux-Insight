@@ -910,7 +910,7 @@ acpi_boot_init() ->
 					set_fixmap_nocache(FIX_IO_APIC_BASE_0 + idx, address);  //--7--
 					ioapics[idx].mp_config.apicid = io_apic_unique_id(idx, id);
 					gsi_cfg->gsi_base = gsi_base;  //--8--
-                    gsi_cfg->gsi_end = gsi_end;
+					gsi_cfg->gsi_end = gsi_end;
 				}
 ```
 
@@ -944,10 +944,10 @@ IOAPIC寄存器的访问：通过IOREGSEL和IOWIN这两个寄存器来间接访�
 ```
 acpi_boot_init() ->
 	acpi_parse_hpet() {
-        hpet_address = hpet_tbl->address.address;  //-1-
-        hpet_blockid = hpet_tbl->sequence;  //-2-
-        hpet_res = alloc_bootmem(sizeof(*hpet_res) + HPET_RESOURCE_NAME_SIZE);  //-3-
-        hpet_res->start = hpet_address;
+		hpet_address = hpet_tbl->address.address;  //-1-
+		hpet_blockid = hpet_tbl->sequence;  //-2-
+		hpet_res = alloc_bootmem(sizeof(*hpet_res) + HPET_RESOURCE_NAME_SIZE);  //-3-
+		hpet_res->start = hpet_address;
 		hpet_res->end = hpet_address + (1 * 1024) - 1;
 	}
 ```
