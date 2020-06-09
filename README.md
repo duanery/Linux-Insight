@@ -21,6 +21,11 @@
 ## 3 初始化
 *模块的初始化入口，以及初始化阶段做了什么*
 
+### 3.1 start_kernel初始化
+
+### 3.2 initcall初始化
+*core_initcall(fn)  arch_initcall(fn)  fs_initcall(fn)  device_initcall(fn)  late_initcall(fn)*
+
 ## 4 源码简析
 *简要介绍核心源码，或者详解核心源码*
 
