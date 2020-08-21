@@ -89,11 +89,15 @@ tracepoint跟踪接口，导出符号，内核如何使用接口*
 
 *\[2\] [kernel_exploring][2]*
 
+*\[3\] [蜗窝科技][3]*
+
 [1]: https://0xax.gitbooks.io/linux-insides/ "linux-insides"
 [2]: https://richardweiyang.gitbooks.io/kernel-exploring/	"kernel_exploring"
+[3]: http://www.wowotech.net/	"蜗窝科技"
 
 # 排版约束
 
 1. 文章中提到的源码变量，统一使用*斜体*。全局变量**加粗**显示，局部变量不加粗。不重要的全局变量也可以不加粗。首次引用使用斜体，非首次引用可以不加粗不使用斜体。
 2. 文章中提到的函数名，统一在函数名后加'()'来标识。括号内不加函数的参数。
 3. 文章中提到的超过1行的源码，使用代码块引用。不超过一行的代码，使用行内引用。
+4. 流程图编辑器：[draw.io](https://app.diagrams.net/?mode=github) 可以直接编辑git仓库内的png图片，确保流程图可以保持更新。
